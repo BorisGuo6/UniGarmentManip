@@ -89,6 +89,8 @@ class camera_Config:
         self.render_type=["cloth"]
         self.cam_position=[0, 2.5, 0.0]
         self.cam_angle=[0,-np.pi/2,0]
+        # self.cam_position=[-1.5, 1.5, 1.5]
+        # self.cam_angle=[-np.pi/4,-np.pi/5,0]
         self.cam_size=[720,720]
         # self.cam_fov=39.5978/180*np.pi
         self.cam_fov=np.pi/4

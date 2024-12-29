@@ -28,7 +28,7 @@ import pyflex
 from typing import List
 # from garmentgym.garmentgym.base.config import Task_result
 from garmentgym.garmentgym.base.record import cross_Deform_info
-
+import json
 
 
 
@@ -98,13 +98,14 @@ def world_to_pixel_valid(world_point,depth,camera_intrinsics,camera_extrinsics):
 if __name__=="__main__":
     parser=argparse.ArgumentParser()
     parser.add_argument('--task_name', type=str,default="simple")
-    parser.add_argument('--demonstration',type=str,default='./demonstration/trousers/fold/00051')
-    parser.add_argument('--current_cloth',type=str,default='./garmentgym/trousers')
+    parser.add_argument('--demonstration',type=str,default='./demonstration/trousers/fold/00051')#
+    parser.add_argument('--current_cloth',type=str,default='/home/transfer/chenhn_data/cloth3d_eval/uniG/eval')
     parser.add_argument('--model_path',type=str,default='./checkpoint/trousers.pth')
-    parser.add_argument('--mesh_id',type=str,default='00016')
+    parser.add_argument('--mesh_id',type=str,default='0000')#4,
     parser.add_argument('--log_file', type=str,default="double_fold_from_flat_simple.pkl")
     parser.add_argument('--store_dir',type=str,default="fold_test")
     parser.add_argument("--device",type=str,default="cuda:0")
+    parser.add_argument("--json_id",type=str,default="1")
 
     args=parser.parse_args()
     demonstration=args.demonstration
@@ -115,7 +116,26 @@ if __name__=="__main__":
     log_file=args.log_file
     device=args.device
     task_name=args.task_name
-
+    # batch_input_path = "/home/transfer/chenhn/UniGarmentManip/task/fold/batch_input_PS.json"
+    batch_input_path = "/home/transfer/chenhn/UniGarmentManip/task/fold/batch_input_cloth_eval_data_all_pyflex.json"
+    with open(batch_input_path, 'r') as file:
+        batch_input = json.load(file)
+    current_cloth = batch_input[0]["cloth_root"]
+    mesh_id = batch_input[int(args.json_id)]["cloth_name"]
+    cloth_type = batch_input[int(args.json_id)]["cloth_type"]
+    p = 0
+    if cloth_type == "Pants":
+        p = 0
+        demonstration="./demonstration/trousers/fold/00051"
+        model_path="./checkpoint/trousers.pth"
+    elif cloth_type == "No-sleeve":
+        p = 1
+        demonstration="./demonstration/fold/simple_fold2/07483"
+        model_path="./checkpoint/tops.pth"
+    else:
+        p = 0
+        demonstration="./demonstration/fold/simple_fold2/07483"
+        model_path="./checkpoint/tops.pth"
 
     print("---------------load model----------------")
     # load model
@@ -128,21 +148,49 @@ if __name__=="__main__":
     # load demonstration sequence
     print(demonstration)
     info_sequence=list()
+    ii=0
     for i in sorted(os.listdir(demonstration)):
         if i.endswith('.pkl'):
             with open(os.path.join(demonstration,i),'rb') as f:
                 print("load {}".format(i))
-                info_sequence.append(pickle.load(f))
-
-
+                ii+=1
+                if ii>p:  
+                    data = pickle.load(f)
+                    info_sequence.append(data)
+                    print(data.action)
+    print(info_sequence)
+    if demonstration=='./demonstration/trousers/fold/00051':
+        info_sequence[1],info_sequence[2] = info_sequence[2],info_sequence[1]
+        info_sequence[0].cur_info, info_sequence[1].cur_info = info_sequence[2].cur_info, info_sequence[0].cur_info
+    print(info_sequence)
+    # info_sequence = [info_sequence[1],info_sequence[2]]
     print("---------------load flat cloth----------------")
     # load flat cloth
     env=BimanualFoldEnv(mesh_category_path=current_cloth,store_path=store_dir,id=mesh_id)
-    for j in range(50):
+    for j in range(100):
         pyflex.step()
         pyflex.render()
-
-
+    index = 3
+    output_path = os.path.join(current_cloth, mesh_id)
+    base_name = "mesh"
+    while True:
+        folder_name = os.path.join(output_path, f"{base_name}{index}")
+        if not os.path.exists(folder_name):
+            os.makedirs(folder_name)
+        print(f"Created folder: {folder_name}")
+        break
+        # index += 1
+    particle_pos = pyflex.get_positions().reshape(-1,4)[:env.num_particles,:3]
+    output_file = os.path.join(folder_name,"initial_pcd.txt")
+    np.savetxt(output_file, particle_pos)
+    output_file = os.path.join(folder_name,"faces.txt")
+    np.savetxt(output_file, np.array(env.clothes.mesh.faces),fmt='%d')
+    init_coverage=env.compute_coverage()
+    initial_area_rect = env.calculate_rectangle_ratio(particle_pos)
+    # output = []
+    # pl=env.check_planeness()
+    # output.append(pl)
+    # print("check_planeness:",pl)
 
     action=[]
 
@@ -172,6 +220,7 @@ if __name__=="__main__":
         action_points=cur_action[1]
         action_pcd=[]
         action_id=[]
+        # print("ACTION",action_points)
         for point in action_points:
             point_pixel=world_to_pixel_valid(point,demo.cur_info.depth,demo.config.get_camera_matrix()[0],demo.config.get_camera_matrix()[1]).astype(np.int32)
             cam_matrix=demo.config.get_camera_matrix()[0]
@@ -183,7 +232,7 @@ if __name__=="__main__":
             point_pcd=point_pcd.reshape(1,3)
             point_id=np.argmin(np.linalg.norm(demo_pc[:,:3]-point_pcd,axis=1))
             action_id.append(point_id)
-
+        # print("ACTION",action_id)
 
         #-------------pass network--------------
 
@@ -219,20 +268,35 @@ if __name__=="__main__":
             action_rgbd[1]=cur_pc[cur_pcd_id,1]*cur_matrix[1,1]/cur_pc[cur_pcd_id,2]+cur_matrix[1,2]
             cur_world=pixel_to_world(action_rgbd,cur_pc[cur_pcd_id,2],cur_shape.config.get_camera_matrix()[0],cur_shape.config.get_camera_matrix()[1])
             action_world.append(cur_world)
-        
+        # print("ACTION",action_world)
         #-------------execute action--------------
         env.execute_action([action_function,action_world])
+        particle_pos = pyflex.get_positions().reshape(-1,4)[:env.num_particles,:3]
+        output_file = os.path.join(folder_name,"step_"+str(i)+"_pcd.txt")
+        np.savetxt(output_file, particle_pos)
+        # pl=env.check_planeness()
+        # output.append(pl)
+        # print("check_planeness:",pl)
 
 
 
     
 
     #-------------check success--------------
-    result=env.check_success(type=task_name)
+    result=env.check_success(type=task_name, init_coverage=init_coverage,initial_area_rect=initial_area_rect)
+    particle_pos = pyflex.get_positions().reshape(-1,4)[:env.num_particles,:3]
+    output_file = os.path.join(folder_name,"fin_pcd.txt")
+    # for i,pl in enumerate(output):
+    #     print("step",i,"_planeness:",pl)
+    np.savetxt(output_file, particle_pos)
+    # output_file = os.path.join(folder_name,"planeness.txt")
+    # np.savetxt(output_file, np.array(output))
+    # output_file = os.path.join(folder_name,"fin_faces.txt")
+    # np.savetxt(output_file, np.array(env.clothes.mesh.faces))
+
     print("fold result:",result)
 
         
-       
 
 
 

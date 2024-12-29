@@ -93,9 +93,9 @@ if __name__=="__main__":
     parser=argparse.ArgumentParser()
     parser.add_argument('--task_name', type=str,default="simple")
     parser.add_argument('--demonstration',type=str,default='./demonstration/fold/simple_fold/00044')
-    parser.add_argument('--current_cloth',type=str,default='./garmentgym/tops')
-    parser.add_argument('--model_path',type=str,default='./checkpoint/tops.pth')
-    parser.add_argument('--mesh_id',type=str,default='01500')
+    parser.add_argument('--current_cloth',type=str,default='/home/transfer/chenhn_data/train/eval_cloth_new')
+    parser.add_argument('--model_path',type=str,default='./checkpoint/dress.pth')
+    parser.add_argument('--mesh_id',type=str,default='0012')
     parser.add_argument('--log_file', type=str,default="single_fold_from_flat_simple.pkl")
     parser.add_argument('--store_dir',type=str,default="fold_test")
     parser.add_argument("--device",type=str,default="cuda:0")
@@ -108,6 +108,9 @@ if __name__=="__main__":
     store_dir=args.store_dir
     log_file=args.log_file
     device=args.device
+# python task/fold/double_from_flat.py --demonstration ./demonstration/fold/simple_fold2/07483 --model_path ./checkpoint/tops.pth --mesh_id 0049
+# python task/fold/double_from_flat.py --demonstration ./demonstration/fold/simple_fold2/07483 --model_path ./checkpoint/tops.pth --mesh_id 0049
+
 
     print("---------------load model----------------")
     # load model
@@ -120,11 +123,14 @@ if __name__=="__main__":
     # load demonstration sequence
     print(demonstration)
     info_sequence=list()
+    ii=0
     for i in sorted(os.listdir(demonstration)):
         if i.endswith('.pkl'):
             with open(os.path.join(demonstration,i),'rb') as f:
                 print("load {}".format(i))
-                info_sequence.append(pickle.load(f))
+                ii+=1
+                if ii>0:
+                    info_sequence.append(pickle.load(f))
 
 
     print("---------------load flat cloth----------------")
@@ -133,7 +139,19 @@ if __name__=="__main__":
     for j in range(50):
         pyflex.step()
         pyflex.render()
-
+    index = 0
+    output_path = os.path.join(current_cloth, mesh_id)
+    base_name = "mesh"
+    while True:
+        folder_name = os.path.join(output_path, f"{base_name}{index}")
+        if not os.path.exists(folder_name):
+            os.makedirs(folder_name)
+            print(f"Created folder: {folder_name}")
+            break
+        index += 1
+    particle_pos = pyflex.get_positions().reshape(-1,4)[:,:3]
+    output_file = os.path.join(folder_name,"initial_pcd.txt")
+    np.savetxt(output_file, particle_pos)
 
     for i in range(len(info_sequence)-1):
         demo=info_sequence[i]
@@ -217,4 +235,7 @@ if __name__=="__main__":
     #-------------check success--------------
     result=env.check_success(type=task_name)
     print("fold result:",result)
+    particle_pos = pyflex.get_positions().reshape(-1,4)[:,:3]
+    output_file = os.path.join(folder_name,"fin_pcd.txt")
+    np.savetxt(output_file, particle_pos)
     env.record_info()

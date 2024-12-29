@@ -7,7 +7,9 @@ import os
 
 import cv2
 import tqdm
-
+from scipy.spatial import ConvexHull
+from sklearn.cluster import DBSCAN
+import torch
 curpath=os.getcwd()
 sys.path.append(curpath)
 sys.path.append(curpath+"/garmentgym")   
@@ -38,7 +40,112 @@ task_config = {"task_config": {
 
 from garmentgym.garmentgym.base.record import task_info
 
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+import trimesh
 
+def save_surface_visualization(vertices, faces, surface_faces, filename="./surface_faces.png"):
+    """
+    Save the visualization of the original mesh and the surface faces as an image.
+    
+    :param vertices: Array of vertices, shape (N, 3)
+    :param faces: Array of all faces, shape (M, 3)
+    :param surface_faces: Array of surface faces, shape (K, 3)
+    :param filename: Name of the file to save the image as (default: "surface_faces.png")
+    """
+    fig = plt.figure(figsize=(10, 8))
+    ax = fig.add_subplot(131, projection='3d')
+# Scatter plot of vertices
+    ax.scatter(vertices[:, 0], vertices[:, 1], vertices[:, 2], color='red', s=1, label='Vertices')
+
+    # Plot the entire mesh (optional, for reference)
+    all_faces = Poly3DCollection(vertices[faces], alpha=0.1, facecolor='gray', edgecolor='gray')
+    ax.add_collection3d(all_faces)
+
+    # Highlight surface faces
+    surface = Poly3DCollection(vertices[surface_faces], alpha=1, facecolor='blue')
+    ax.add_collection3d(surface)
+
+    
+    # Set the view and labels
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+    ax.set_title('Surface Faces Visualization')
+    ax.view_init(elev=30, azim=135)  # Adjust view angle
+
+    # Set equal aspect ratio for better visualization
+    max_range = (vertices.max(axis=0) - vertices.min(axis=0)).max()
+    mid_x = (vertices[:, 0].max() + vertices[:, 0].min()) / 2
+    mid_y = (vertices[:, 1].max() + vertices[:, 1].min()) / 2
+    mid_z = (vertices[:, 2].max() + vertices[:, 2].min()) / 2
+    ax.set_xlim(mid_x - max_range / 2, mid_x + max_range / 2)
+    ax.set_ylim(mid_y - max_range / 2, mid_y + max_range / 2)
+    ax.set_zlim(mid_z - max_range / 2, mid_z + max_range / 2)
+
+    ax = fig.add_subplot(132, projection='3d')
+# Scatter plot of vertices
+    # ax.scatter(vertices[:, 0], vertices[:, 1], vertices[:, 2], color='red', s=1, label='Vertices')
+
+    # Plot the entire mesh (optional, for reference)
+    all_faces = Poly3DCollection(vertices[faces], alpha=0.8, facecolor='gray', edgecolor='gray')
+    ax.add_collection3d(all_faces)
+
+    # Highlight surface faces
+    surface = Poly3DCollection(vertices[surface_faces], alpha=0.3, facecolor='blue')
+    ax.add_collection3d(surface)
+
+    
+    # Set the view and labels
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+    ax.set_title('Surface Faces Visualization')
+    ax.view_init(elev=0, azim=90)  # Adjust view angle
+
+    # Set equal aspect ratio for better visualization
+    max_range = (vertices.max(axis=0) - vertices.min(axis=0)).max()
+    mid_x = (vertices[:, 0].max() + vertices[:, 0].min()) / 2
+    mid_y = (vertices[:, 1].max() + vertices[:, 1].min()) / 2
+    mid_z = (vertices[:, 2].max() + vertices[:, 2].min()) / 2
+    ax.set_xlim(mid_x - max_range / 2, mid_x + max_range / 2)
+    ax.set_ylim(mid_y - max_range / 2, mid_y + max_range / 2)
+    ax.set_zlim(mid_z - max_range / 2, mid_z + max_range / 2)
+
+    ax = fig.add_subplot(133, projection='3d')
+# Scatter plot of vertices
+    # ax.scatter(vertices[:, 0], vertices[:, 1], vertices[:, 2], color='red', s=1, label='Vertices')
+
+    # Plot the entire mesh (optional, for reference)
+    all_faces = Poly3DCollection(vertices[faces], alpha=0.8, facecolor='gray', edgecolor='gray')
+    ax.add_collection3d(all_faces)
+
+    # Highlight surface faces
+    surface = Poly3DCollection(vertices[surface_faces], alpha=0.3, facecolor='blue')
+    ax.add_collection3d(surface)
+
+    
+    # Set the view and labels
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+    ax.set_title('Surface Faces Visualization')
+    ax.view_init(elev=0, azim=-90)  # Adjust view angle
+
+    # Set equal aspect ratio for better visualization
+    max_range = (vertices.max(axis=0) - vertices.min(axis=0)).max()
+    mid_x = (vertices[:, 0].max() + vertices[:, 0].min()) / 2
+    mid_y = (vertices[:, 1].max() + vertices[:, 1].min()) / 2
+    mid_z = (vertices[:, 2].max() + vertices[:, 2].min()) / 2
+    ax.set_xlim(mid_x - max_range / 2, mid_x + max_range / 2)
+    ax.set_ylim(mid_y - max_range / 2, mid_y + max_range / 2)
+    ax.set_zlim(mid_z - max_range / 2, mid_z + max_range / 2)
+
+    # Save the image
+    # plt.legend()
+    plt.savefig(filename, dpi=300, bbox_inches='tight')  # Save with high resolution
+    plt.close()
+    print(f"Saved visualization to {filename}")
 
 class BimanualFoldEnv(ClothesEnv):
     def __init__(self,mesh_category_path:str,gui=True,store_path="./",id=-1):
@@ -65,6 +172,71 @@ class BimanualFoldEnv(ClothesEnv):
         
         self.num_particles = self.clothes.mesh.num_particles    #我瞎改的
         self.particle_radius=0.00625
+
+    def calculate_face_normals_similarity(self,vertices, faces):
+        v0 = vertices[faces[:, 0]]
+        v1 = vertices[faces[:, 1]]
+        v2 = vertices[faces[:, 2]]
+
+        normals = np.cross(v1 - v0, v2 - v0)
+        # 单位化法向量
+        normals = normals / np.linalg.norm(normals, axis=1, keepdims=True)
+        normals[normals[:, 1] < 0] *= -1
+        normal_mean = np.mean(normals, axis=0)
+        normal_mean = normal_mean / np.linalg.norm(normal_mean)  # 单位化均值
+        # 计算每个法向量与均值的相似度（点积）
+        similarities = np.abs(np.dot(normals, normal_mean))
+        return np.mean(similarities)
+
+    def check_planeness(self):
+        faces=self.clothes.mesh.faces
+        cur_pos=pyflex.get_positions().reshape(-1,4)[:,:3]
+        cloth_pos=cur_pos[:self.clothes.mesh.num_particles]
+        vertices=np.array(cloth_pos)
+        
+        mesh = trimesh.Trimesh(vertices, faces, process=True)
+
+        # Define ray origins (above each vertex, high on Z-axis)
+        ray_origins = mesh.triangles_center + np.array([0, 1.0, 0])  # Offset above the triangles
+
+        # Define ray directions (straight down)
+        ray_directions = np.tile(np.array([0, -1, 0]), (len(ray_origins), 1))
+
+        # Initialize the ray intersector
+        intersector = trimesh.ray.ray_pyembree.RayMeshIntersector(mesh)
+
+        # Perform ray intersection
+        hit_faces = intersector.intersects_id(
+            ray_origins=ray_origins,
+            ray_directions=ray_directions,
+            return_locations=True,
+        )
+
+        # Calculate hit distances for all intersections
+        hit_distances = np.linalg.norm(hit_faces[2] - ray_origins[hit_faces[1]], axis=1)
+
+        # Create an array to store the first face hit per ray
+        first_hit_faces = np.full(len(ray_origins), -1, dtype=np.int32)
+
+        # Loop through the rays and find the closest hit for each
+        for ray_idx in range(len(ray_origins)):
+            # Find all hits for the current ray
+            ray_hits = np.where(hit_faces[1] == ray_idx)[0]
+            
+            if len(ray_hits) > 0:
+                # Get distances for the current ray's hits
+                ray_hit_distances = hit_distances[ray_hits]
+                
+                # Find the closest hit
+                closest_hit_idx = ray_hits[np.argmin(ray_hit_distances)]
+                
+                # Store the closest hit face
+                first_hit_faces[ray_idx] = hit_faces[0][closest_hit_idx]
+        mask=np.unique(first_hit_faces)
+        print(len(mask),len(faces))
+        save_surface_visualization(vertices,faces,faces[mask])
+        return self.calculate_face_normals_similarity(vertices,faces[mask])
+    
         
         
     def move_sleeve(self):
@@ -521,7 +693,7 @@ class BimanualFoldEnv(ClothesEnv):
         self.two_movep([preplace_pos1, preplace_pos2], speed=8e-2)  # 修改此处
         self.two_hide_end_effectors()
     
-    def two_movep(self, pos, speed=None, limit=1000, min_steps=None, eps=1e-4):
+    # def two_movep(self, pos, speed=None, limit=1000, min_steps=None, eps=1e-4):
         if speed is None:
             speed = 0.08
         target_pos = np.array(pos)
@@ -543,6 +715,43 @@ class BimanualFoldEnv(ClothesEnv):
                     action.extend([*(curr+delta*speed), float(gs)])
             action = np.array(action)
             self.action_tool.step(action)
+
+
+        raise MoveJointsException
+    def two_movep(self, pos, speed=None, limit=1000, min_steps=None, eps=1e-4):
+        if speed is None:
+            speed = 0.08
+        target_pos = np.array(pos)
+        pick = False
+        for gs in self.grasp_states:
+            pick = pick or float(gs)
+        for step in range(limit):
+            curr_pos,pts = self.action_tool._get_pos()
+            deltas = [(targ - curr)
+                      for targ, curr in zip(target_pos, curr_pos)]
+            dists = [np.linalg.norm(delta) for delta in deltas]
+            if all([dist < eps for dist in dists]) and\
+                    (min_steps is None or step > min_steps):
+                return
+            action = []
+            
+            for targ, curr, delta, dist, gs in zip(
+                    target_pos, curr_pos, deltas, dists, self.grasp_states):
+                if dist < speed:
+                    action.extend([*targ, float(gs)])
+                else:
+                    delta = delta/dist
+                    action.extend([*(curr+delta*speed), float(gs)])
+                
+            action = np.array(action)
+            self.action_tool.step(action)
+            # if not pick and step > 30:
+            #     maxy = np.max(pts[:,1])
+            #     # print("HERE",maxy , np.max(curr_pos[:,1]))
+            #     if step == 31:
+            #         print("HERE",maxy , np.max(curr_pos[:,1]))
+            #     if maxy > np.max(curr_pos[:,1]):
+            #         assert(0)
 
 
         raise MoveJointsException
@@ -604,9 +813,29 @@ class BimanualFoldEnv(ClothesEnv):
     
     def compute_coverage(self):
         return self.get_current_covered_area(self.num_particles, self.particle_radius)
-    
-    def check_success(self,type:str):
-        initial_area=self.clothes.init_coverage
+    def dbscan(self,points):
+        db = DBSCAN(eps=0.3, min_samples=10).fit(torch.from_numpy(points))
+        labels = db.labels_
+        return points[labels != -1]
+    def calculate_rectangle_ratio(self,point_cloud):
+        # 将3D点云投影到XY平面
+        # point_cloud = self.dbscan(point_cloud)
+        points_2d = point_cloud[:, [0,2]]
+        
+        # 计算点云的凸包
+        hull = ConvexHull(points_2d)
+        hull_points = points_2d[hull.vertices]
+        
+        # 使用OpenCV计算最小外接矩形
+        rect = cv2.minAreaRect(hull_points)
+        box = cv2.boxPoints(rect)
+        width = np.linalg.norm(box[0] - box[1])
+        height = np.linalg.norm(box[1] - box[2])
+        area_rect = width * height
+        
+        return area_rect
+    def check_success(self,type:str,init_coverage,initial_area_rect):
+        initial_area=init_coverage
         init_mask=self.clothes.init_cloth_mask
         if type=="funnel":
 
@@ -668,10 +897,15 @@ class BimanualFoldEnv(ClothesEnv):
             cloth_pos=np.array(cloth_pos)
             
             final_area=self.compute_coverage()
+            
             print("final_area=",final_area)
             
             rate=final_area/initial_area
             print("rate=",rate)
+
+            area_rect = self.calculate_rectangle_ratio(cloth_pos)
+            print("initial&fin_area_rect_rate=", area_rect/initial_area_rect)
+            print("rect_ratio=",final_area/area_rect)
 
             
             bottom_left=cloth_pos[self.clothes.bottom_left][:3].copy()

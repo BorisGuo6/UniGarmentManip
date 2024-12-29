@@ -13,9 +13,10 @@ import numpy as np
 # from Imath import PixelType
 from garmentgym.garmentgym.base.clothes_mesh import clothes_mesh
 from garmentgym.garmentgym.utils.basic_utils import *
-
+from scipy.spatial import ConvexHull
+import cv2
 class Clothes:
-    def __init__(self,name:str,mesh_category_path:str,config:Config,scale:int=1.2,need_urs:bool=False,gui:bool=True,random_choose:bool=True,domain_randomlization:bool=False,id=None) -> None:
+    def __init__(self,name:str,mesh_category_path:str,config:Config,scale:int=0.000002,need_urs:bool=False,gui:bool=True,random_choose:bool=True,domain_randomlization:bool=False,id=None) -> None:
         self.scale=scale
         self.need_urs=need_urs
         self.gui=gui
@@ -31,9 +32,9 @@ class Clothes:
 
         if self.domain_randomlization:
             config.cloth_config.update({'cloth_mass':np.random.uniform(30,70),'cloth_stiff':np.random.uniform(0.2, 2.0)})
-        if 'skirt' in self.path or 'trousers' in self.path or 'dress' in self.path:
-            config.cloth_config.scale=1.2
-            config.cloth_config.cloth_size_scale=1.2
+        if False:#'skirt' in self.path or 'trousers' in self.path or 'dress' in self.path:
+            config.cloth_config.scale=scale
+            config.cloth_config.cloth_size_scale=scale
         self.mesh.set_config(config.cloth_config.cloth_pos,config.cloth_config.cloth_size_scale,config.cloth_config.cloth_mass,config.cloth_config.cloth_stiff)
 
         self.current_mesh=None
@@ -55,21 +56,21 @@ class Clothes:
 
     def get_mesh(self,mesh_category_path:str,random_choose:bool):
         assert mesh_category_path is not None
-        if 'skirt' in mesh_category_path or 'trousers' in mesh_category_path or 'dress' in mesh_category_path:
+        if False:#'skirt' in mesh_category_path or 'trousers' in mesh_category_path or 'dress' in mesh_category_path:
             if random_choose:
                 self.path = str(random.choice(list(Path(mesh_category_path).rglob('*.obj'))))
-                self.id=int(self.path.split('/')[-2])
+                # self.id=int(self.path.split('/')[-2])
             else:
                 self.path = os.path.join(mesh_category_path,str(self.id))
                 self.path=str(list(Path(self.path).rglob('*.obj'))[0])
         else:
             if random_choose:
-                self.path = str(random.choice(list(Path(mesh_category_path).rglob('*processed.obj'))))
-                self.id=int(self.path.split('/')[-2])
+                self.path = str(random.choice(list(Path(mesh_category_path).rglob('*.obj'))))
+                # self.id=int(self.path.split('/')[-2])
             else:
                 self.path = os.path.join(mesh_category_path,str(self.id))
                 print(self.path)
-                self.path=str(list(Path(self.path).rglob('*processed.obj'))[0])
+                self.path=str(list(Path(self.path).rglob('*.obj'))[0])
         
         return clothes_mesh(path=self.path,name=self.name,need_urs=self.need_urs)
     def flatten_cloth(self):
@@ -83,9 +84,9 @@ class Clothes:
                 pyflex.render()
         center_object()
     def init_info(self):
-        if 'dress' in self.path or 'skirt' in self.path or 'trousers' in self.path:
+        if 'PS' in self.path or 'PL' in self.path or 'trousers' in self.path:
             self.init_position=pyflex.get_positions().reshape(-1,4)
-            self.init_position[:,:3]=self.init_position[:,:3]@get_rotation_matrix(np.array([0,1,0]),-np.pi)
+            self.init_position[:,:3]=self.init_position[:,:3]@get_rotation_matrix(np.array([0,1,0]),np.pi/2)
             pyflex.set_positions(self.init_position.flatten())
         else:
             self.init_position=pyflex.get_positions().reshape(-1,4)
@@ -101,8 +102,24 @@ class Clothes:
         self.get_keypoint_groups(xzy)
         rgb,depth=pyflex.render_cloth()
         self.init_cloth_mask=self.get_cloth_mask(rgb)
-        self.init_coverage=self.get_current_covered_area(self.mesh.num_particles)
-
+        
+        
+    def calculate_rectangle_ratio(self,point_cloud):
+        # 将3D点云投影到XY平面
+        points_2d = point_cloud[:, [0,2]]
+        
+        # 计算点云的凸包
+        hull = ConvexHull(points_2d)
+        hull_points = points_2d[hull.vertices]
+        
+        # 使用OpenCV计算最小外接矩形
+        rect = cv2.minAreaRect(hull_points)
+        box = cv2.boxPoints(rect)
+        width = np.linalg.norm(box[0] - box[1])
+        height = np.linalg.norm(box[1] - box[2])
+        area_rect = width * height
+        
+        return area_rect
     
     def get_current_covered_area(self,cloth_particle_num, cloth_particle_radius: float = 0.00625):
         """
@@ -166,8 +183,10 @@ class Clothes:
         mid = (x_min + x_max)/2
         lin = np.linspace(mid, x_max, num=num_bins)
         for xleft, xright in zip(lin[:-1], lin[1:]):
-            max_ys.append(-1 * y[np.where((xleft < x) & (x < xright))].min())
-            min_ys.append(-1 * y[np.where((xleft < x) & (x < xright))].max())
+            if(len(np.where((xleft < x) & (x < xright))[0])>0):
+                max_ys.append(-1 * y[np.where((xleft < x) & (x < xright))].min())
+                min_ys.append(-1 * y[np.where((xleft < x) & (x < xright))].max())
+
 
         #plot the rate of change of the shirt height wrt x
         diff = np.array(max_ys) - np.array(min_ys)

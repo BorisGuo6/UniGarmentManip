@@ -14,9 +14,10 @@ def center_object():
 
 def set_random_cloth_color():
     hsv_color = [
-        random.uniform(0.0, 1.0),
-        random.uniform(0.0, 1.0),
-        random.uniform(0.6, 1.0)
+        1.0,
+        0.0,
+        0.0
+        # random.uniform(0.6, 1.0)
     ]
     rgb_color = colorsys.hsv_to_rgb(*hsv_color)
     pyflex.change_cloth_color(rgb_color)

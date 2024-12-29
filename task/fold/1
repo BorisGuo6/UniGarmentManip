@@ -1,0 +1,77 @@
+composite -dissolve 15% -gravity center 0-.png 1-.png 0---.png
+composite -dissolve 15% -gravity center 1-.png 2-.png 1---.png
+composite -dissolve 15% -gravity center 2-.png 3-.png 2---.png
+composite -dissolve 15% -gravity center 3-.png 4-.png 3---.png
+composite -dissolve 15% -gravity center 4-.png 5-.png 4---.png
+composite -dissolve 15% -gravity center 5-.png 7-.png 7---.png
+composite -dissolve 30% -gravity center 6-.png 7-.png 6---.png
+
+
+convert 0---.png -crop 673x500+36+86 +repage 0-f.png
+convert 1---.png -crop 673x500+36+86 +repage 1-f.png
+convert 2---.png -crop 673x500+36+86 +repage 2-f.png
+convert 3---.png -crop 673x500+36+86 +repage 3-f.png
+convert 4---.png -crop 673x500+36+86 +repage 4-f.png
+convert 7---.png -crop 673x500+36+86 +repage 7-f.png
+
+convert 0---.png -crop 673x500+0+86 +repage 0-f.png
+convert 1---.png -crop 673x500+0+86 +repage 1-f.png
+convert 2---.png -crop 673x500+0+86 +repage 2-f.png
+convert 3---.png -crop 673x500+0+86 +repage 3-f.png
+convert 4---.png -crop 673x500+0+86 +repage 4-f.png
+convert 7---.png -crop 673x500+0+86 +repage 7-f.png
+
+qi2017pointnetdeephierarchicalfeature
+\citep{qi2017pointnetdeephierarchicalfeature}
+\begin{figure}[h!]
+    \centering
+    \subfloat[]{\includegraphics[width=0.18\textwidth]{Figures/sim-visualize/0--.png}}
+    \hspace{-0.4cm} 
+    \subfloat[]{\includegraphics[width=0.18\textwidth]{Figures/sim-visualize/1--.png}}
+    \hspace{-0.4cm}
+    \subfloat[]{\includegraphics[width=0.18\textwidth]{Figures/sim-visualize/2--.png}}
+    \hspace{-0.4cm}
+    \subfloat[]{\includegraphics[width=0.18\textwidth]{Figures/sim-visualize/3--.png}}
+    \hspace{-0.4cm}
+    \subfloat[]{\includegraphics[width=0.18\textwidth]{Figures/sim-visualize/4--.png}}
+    \hspace{-0.4cm}
+    \subfloat[]{\includegraphics[width=0.18\textwidth]{Figures/sim-visualize/7--.png}}
+    
+    \caption{Visualization of simulation results 30}
+\end{figure}
+
+\begin{figure}[h!]
+    \centering
+    \subfloat[]{\includegraphics[width=0.18\textwidth]{Figures/sim-visualize/0---.png}}
+    \hspace{-0.4cm} 
+    \subfloat[]{\includegraphics[width=0.18\textwidth]{Figures/sim-visualize/1---.png}}
+    \hspace{-0.4cm}
+    \subfloat[]{\includegraphics[width=0.18\textwidth]{Figures/sim-visualize/2---.png}}
+    \hspace{-0.4cm}
+    \subfloat[]{\includegraphics[width=0.18\textwidth]{Figures/sim-visualize/3---.png}}
+    \hspace{-0.4cm}
+    \subfloat[]{\includegraphics[width=0.18\textwidth]{Figures/sim-visualize/4---.png}}
+    \hspace{-0.4cm}
+    \subfloat[]{\includegraphics[width=0.18\textwidth]{Figures/sim-visualize/7---.png}}
+    
+    \caption{Visualization of simulation results 15}
+\end{figure}
+
+\begin{figure}[h!]
+    \centering
+    \subfloat[]{\includegraphics[width=0.14\textwidth]{Figures/sim-visualize/0-.png}}
+    \hspace{-0.1cm} 
+    \subfloat[]{\includegraphics[width=0.14\textwidth]{Figures/sim-visualize/1-.png}}
+    \hspace{-0.1cm}
+    \subfloat[]{\includegraphics[width=0.14\textwidth]{Figures/sim-visualize/2-.png}}
+    \hspace{-0.1cm}
+    \subfloat[]{\includegraphics[width=0.14\textwidth]{Figures/sim-visualize/3-.png}}
+    \hspace{-0.1cm}
+    \subfloat[]{\includegraphics[width=0.14\textwidth]{Figures/sim-visualize/4-.png}}
+    \hspace{-0.1cm}
+    \subfloat[]{\includegraphics[width=0.14\textwidth]{Figures/sim-visualize/5-.png}}
+    \hspace{-0.1cm}
+    \subfloat[]{\includegraphics[width=0.14\textwidth]{Figures/sim-visualize/7-.png}}
+    
+    \caption{Visualization of simulation results}
+\end{figure}

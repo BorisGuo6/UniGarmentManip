@@ -1,0 +1,13 @@
+[
+    {
+        "cloth_root": "/home/transfer/chenhn_data/cloth_eval_all/cloth_eval_data_all_uniG"
+    },
+    {
+        "cloth_type": "Short-sleeve",
+        "cloth_name": "DSSS/DSSS_Dress385_action0"
+    },
+    {
+        "cloth_type": "Short-sleeve",
+        "cloth_name": "TNSC/TNSC_Top560_action0"
+    }
+]
